@@ -104,6 +104,7 @@ class AppManager:  # pylint: disable=too-few-public-methods
         food_qty = self._settings.get_int("Simulation", "food_quantity")
         const = compute_constants(self._settings)
         Agent.ENERGY_MAX = const.energy_max
+        self._console.print(f"[dim]Игровой режим. Порог движения: {const.move_threshold:.2f}[/dim]")
 
         # -------------------------
         # Подготовка NEAT сетей
@@ -192,8 +193,9 @@ class AppManager:  # pylint: disable=too-few-public-methods
                     old_pos = agent.position
                     obs = agent.get_observation(env)
                     dx_raw, dy_raw = agent.net.activate(obs)
-                    dx = max(-1, min(1, int(round(dx_raw))))
-                    dy = max(-1, min(1, int(round(dy_raw))))
+                    threshold = const.move_threshold
+                    dx = -1 if dx_raw < -threshold else 1 if dx_raw > threshold else 0
+                    dy = -1 if dy_raw < -threshold else 1 if dy_raw > threshold else 0
                     agent.move(dx, dy, field_size, env)
                     if agent.position != old_pos:
                         renderer.add_log(f"Агент {agent.team} -> {agent.position}", "MOVE")

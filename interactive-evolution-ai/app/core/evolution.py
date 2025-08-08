@@ -124,6 +124,7 @@ class EvolutionManager:  # pylint: disable=too-many-instance-attributes
         info_table.add_row("Количество поколений", str(num_generations))
         info_table.add_row("Входы нейросети", str(self._config.genome_config.num_inputs))
         info_table.add_row("Выходы нейросети", str(self._config.genome_config.num_outputs))
+        info_table.add_row("Порог движения", f"{self._const.move_threshold:.2f}")
         self._console.print(info_table)
         self._console.print("[yellow]Запуск эволюции...[/]\n")
 

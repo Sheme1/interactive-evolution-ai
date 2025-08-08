@@ -6,6 +6,7 @@ NEAT/physics – the library derives sane values automatically.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import configparser
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -80,8 +81,13 @@ def compute_constants(settings) -> SimConstants:  # type: ignore[valid-type]
     teleporter_proximity_penalty = tick_penalty * 2.0
 
     # --- ДВИЖЕНИЕ ---
-    import math
-    move_threshold = max(0.05, min(0.18, 0.05 + 0.03 * math.log2(field_size)))
+    # Порог считывается напрямую из настроек для гибкости.
+    # Добавлена отказоустойчивость на случай опечаток в конфиге.
+    try:
+        move_threshold = settings.get_float("Simulation", "move_threshold")
+        move_threshold = max(0.0, min(1.0, move_threshold))  # Clamp
+    except (configparser.NoSectionError, configparser.NoOptionError, ValueError):
+        move_threshold = 0.1  # Fallback
 
     return SimConstants(
         energy_max=energy_max,
