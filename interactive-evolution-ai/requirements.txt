@@ -1,0 +1,6 @@
+pygame
+neat-python
+torch
+rich
+pyperclip
+questionary

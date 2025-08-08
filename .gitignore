@@ -1,0 +1,31 @@
+@'
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+
+# Virtual env / secrets
+venv/
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+.cursor
+@.cursorignore
+
+# Project-specific
+interactive-evolution-ai/models/
+interactive-evolution-ai/logs/
+*.pkl
+
+# OS
+Thumbs.db
+.DS_Store
+'@ | Out-File -Encoding UTF8 .gitignore
