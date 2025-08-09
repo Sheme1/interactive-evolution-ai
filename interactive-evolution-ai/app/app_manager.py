@@ -70,8 +70,8 @@ class AppManager:  # pylint: disable=too-few-public-methods
         """Запуск режима игры с выбором двух моделей."""
         from .utils.file_utils import pick_model_file  # локальный импорт
         import pickle
-        file_a = pick_model_file("Выберите модель для агента BLUE")
-        file_b = pick_model_file("Выберите модель для агента RED")
+        file_a = pick_model_file("Выберите модель для агента A (BLUE)")
+        file_b = pick_model_file("Выберите модель для агента B (RED)")
         if not file_a or not file_b:
             self._console.print("[red]Файлы не выбраны, отмена.")
             return
@@ -82,7 +82,7 @@ class AppManager:  # pylint: disable=too-few-public-methods
             genome_b = pickle.load(fp)
 
         try:
-            self._console.print(f"[bold yellow]Запуск игры с моделями:[/]\n- Агент BLUE: [cyan]{file_a.name}[/cyan]\n- Агент RED: [cyan]{file_b.name}[/cyan]")
+            self._console.print(f"[bold yellow]Запуск игры с моделями:[/]\n- Агент A (BLUE): [cyan]{file_a.name}[/cyan]\n- Агент B (RED): [cyan]{file_b.name}[/cyan]")
             self._run_game(genome_a, genome_b)
         except UserQuitException:
             self._console.print("\n[yellow]Игра прервана пользователем. Возврат в главное меню.[/yellow]")
@@ -268,8 +268,8 @@ class AppManager:  # pylint: disable=too-few-public-methods
                 renderer.update()
 
     def _handle_continue_training(self) -> None:
-        file_a = pick_model_file("Выберите модель для команды BLUE")
-        file_b = pick_model_file("Выберите модель для команды RED")
+        file_a = pick_model_file("Выберите модель для команды A (BLUE)")
+        file_b = pick_model_file("Выберите модель для команды B (RED)")
         if not file_a or not file_b:
             self._console.print("[red]Файлы не выбраны, отмена.")
             return
@@ -286,7 +286,7 @@ class AppManager:  # pylint: disable=too-few-public-methods
             with open(file_b, "rb") as fp:
                 genome_b = pickle.load(fp)
 
-            self._console.print(f"[bold yellow]Продолжение тренировки из файлов:[/]\n- Команда BLUE: [cyan]{file_a.name}[/cyan]\n- Команда RED: [cyan]{file_b.name}[/cyan]")
+            self._console.print(f"[bold yellow]Продолжение тренировки из файлов:[/]\n- Команда A (BLUE): [cyan]{file_a.name}[/cyan]\n- Команда B (RED): [cyan]{file_b.name}[/cyan]")
             mgr = EvolutionManager(self._settings, self._neat_config_path)
             mgr.run_evolution(visualize=visualize, continue_from=(genome_a, genome_b))
         except UserQuitException:

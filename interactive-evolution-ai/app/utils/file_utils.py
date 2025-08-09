@@ -23,9 +23,9 @@ def save_best_genomes(agent_a_genome: Any, agent_b_genome: Any) -> Path:
     out_dir = MODELS_DIR / timestamp
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    with (out_dir / "best_agent_BLUE.pkl").open("wb") as fp:
+    with (out_dir / "best_agent_A.pkl").open("wb") as fp:
         pickle.dump(agent_a_genome, fp)
-    with (out_dir / "best_agent_RED.pkl").open("wb") as fp:
+    with (out_dir / "best_agent_B.pkl").open("wb") as fp:
         pickle.dump(agent_b_genome, fp)
 
     return out_dir

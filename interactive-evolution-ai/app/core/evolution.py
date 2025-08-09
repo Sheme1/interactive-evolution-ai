@@ -134,11 +134,20 @@ class EvolutionManager:  # pylint: disable=too-many-instance-attributes
             eval_fn = self._make_eval_genomes(visualize, live)
             winner = population.run(eval_fn, n=num_generations)
 
-        # Сохранение лучшего генома (победителя). В текущей версии NEAT-Python
-        # функция `Population.run` возвращает один геном, поэтому сохраняем один
-        # и тот же геном для обеих команд, чтобы сохранить совместимость
-        # с текущей реализацией `save_best_genomes`.
-        output_path = save_best_genomes(winner, winner)
+        # --- Найти лучшие геномы для каждой команды из финальной популяции ---
+        # Объект популяции содержит все геномы из последнего поколения.
+        final_genomes_list = list(population.population.values())
+
+        # Разделяем на команды по четным/нечетным индексам, как в eval_genomes
+        genomes_a = [g for i, g in enumerate(final_genomes_list) if i % 2 == 0]
+        genomes_b = [g for i, g in enumerate(final_genomes_list) if i % 2 == 1]
+
+        # На случай, если фитнес None, считаем его -inf.
+        # Если команда пуста, используем общего победителя как запасной вариант.
+        best_genome_a = max(genomes_a, key=lambda g: g.fitness if g.fitness is not None else -float('inf')) if genomes_a else winner
+        best_genome_b = max(genomes_b, key=lambda g: g.fitness if g.fitness is not None else -float('inf')) if genomes_b else winner
+
+        output_path = save_best_genomes(best_genome_a, best_genome_b)
         self._console.print(f"\n[bold green]Эволюция завершена.[/] Лучшие геномы сохранены в [cyan]{output_path}[/cyan]")
 
     # ------------------------------------------------------------------
