@@ -484,7 +484,7 @@ class Renderer:  # pylint: disable=too-few-public-methods,too-many-instance-attr
             pygame.draw.line(self.game_surface, PURPLE, start_pix, end_pix, width=2)
             drawn_pairs.add(pair)
 
-    def update(self) -> None:
+    def update(self, exit_on_esc: bool = False) -> bool:
         """Финализировать кадр и обработать события, блокируясь на время игрового тика.
 
         Эта функция заменяет собой простой `pygame.time.Clock.tick()`. Она
@@ -496,6 +496,15 @@ class Renderer:  # pylint: disable=too-few-public-methods,too-many-instance-attr
 
         Предполагается, что `game_surface` уже обновлена (на ней нарисовано
         актуальное состояние игрового поля) до вызова этого метода.
+
+        Parameters
+        ----------
+        exit_on_esc
+            Если True, нажатие клавиши ESC вернёт True для выхода из цикла.
+
+        Returns
+        -------
+            True, если пользователь запросил выход (например, нажал ESC).
         """
         game_tick_duration_ms = 1000.0 / self._game_fps
         start_time_ms = pygame.time.get_ticks()
@@ -512,6 +521,9 @@ class Renderer:  # pylint: disable=too-few-public-methods,too-many-instance-attr
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_F11:
                         pygame.display.toggle_fullscreen()
+                    elif exit_on_esc and event.key == pygame.K_ESCAPE:
+                        self.add_log("Выход из игры (ESC)...", "INFO")
+                        return True
                     elif event.key == pygame.K_c and (event.mod & pygame.KMOD_CTRL):
                         selected_text = self.log_panel.get_selected_text()
                         if selected_text:
@@ -536,6 +548,8 @@ class Renderer:  # pylint: disable=too-few-public-methods,too-many-instance-attr
             self.log_panel.draw(self._screen)
             pygame.display.flip()
             self._clock.tick(self._ui_fps)
+
+        return False
 
     # ------------------------------------------------------------------
     # Внутренние утилиты

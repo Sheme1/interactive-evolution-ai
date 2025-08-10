@@ -162,9 +162,16 @@ class EvolutionManager:  # pylint: disable=too-many-instance-attributes
         наблюдений (векторы до объектов + локальные сенсоры), а действие —
         это (dx, dy) → 2 выхода.
         """
+        from .agent import Agent
+        from .environment import Environment
+
+        # Создаём фиктивные объекты для определения размера входа сети
+        dummy_env = Environment(field_size=10)
+        dummy_agent = Agent(id=-1, team="DUMMY", position=(0, 0), genome=None, net=None)
+        observation_size = len(dummy_agent.get_observation(dummy_env))
+
         genome_conf = self._config.genome_config
-        # 4 вектора (x,y) до еды/врага/препятствия/телепорта + 8 сенсоров окружения
-        genome_conf.num_inputs = 16
+        genome_conf.num_inputs = observation_size
         genome_conf.num_outputs = 2
 
     def _make_eval_genomes(
@@ -393,8 +400,10 @@ class EvolutionManager:  # pylint: disable=too-many-instance-attributes
                     break
 
             # Метрики поколения
-            genomes_a = [g for idx, (_, g) in enumerate(genomes) if idx % 2 == 0]
-            genomes_b = [g for idx, (_, g) in enumerate(genomes) if idx % 2 == 1]
+            # BUG FIX: Используем атрибут .team для надежного разделения,
+            # так как порядок в `genomes` не гарантирован между вызовами.
+            genomes_a = [g for _, g in genomes if hasattr(g, "team") and g.team == "BLUE"]
+            genomes_b = [g for _, g in genomes if hasattr(g, "team") and g.team == "RED"]
             avg_a = sum(g.fitness for g in genomes_a) / max(1, len(genomes_a))
             avg_b = sum(g.fitness for g in genomes_b) / max(1, len(genomes_b))
             best_a = max((g.fitness for g in genomes_a), default=0.0)

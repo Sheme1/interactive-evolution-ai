@@ -117,8 +117,11 @@ class AppManager:  # pylint: disable=too-few-public-methods
             neat.DefaultStagnation,
             str(self._neat_config_path),
         )
-        # 4 вектора (x,y) до объектов + 8 сенсоров окружения
-        config.genome_config.num_inputs = 16
+        # Динамически определяем размер входа, создав фиктивного агента
+        dummy_env = Environment(field_size=10)
+        dummy_agent = Agent(id=-1, team="DUMMY", position=(0, 0), genome=None, net=None)
+        observation_size = len(dummy_agent.get_observation(dummy_env))
+        config.genome_config.num_inputs = observation_size
         config.genome_config.num_outputs = 2
         net_a = neat.nn.FeedForwardNetwork.create(genome_a, config)
         net_b = neat.nn.FeedForwardNetwork.create(genome_b, config)
@@ -136,8 +139,9 @@ class AppManager:  # pylint: disable=too-few-public-methods
 
         # BUG FIX: Используем Rich Live для обновления метрик без мерцания консоли.
         with Live(console=self._console, auto_refresh=False, transient=False) as live:
+            quit_game = False
             # Бесконечный цикл раундов
-            while True:
+            while not quit_game:
                 renderer.add_log(f"Раунд {round_idx + 1}. Начали!", "GENERATION")
                 round_idx += 1
                 # --- (Re)создаём среду без респавна еды ---
@@ -266,7 +270,9 @@ class AppManager:  # pylint: disable=too-few-public-methods
                     renderer.draw_teleporters(env.teleporters)
                     renderer.draw_food(env.food)
                     renderer.draw_agents(env.agents.values())
-                    renderer.update()
+                    if renderer.update(exit_on_esc=True):
+                        quit_game = True
+                        break
 
     def _handle_continue_training(self) -> None:
         file_a = pick_model_file("Выберите модель для команды A (BLUE)")
