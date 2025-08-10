@@ -86,16 +86,45 @@ class LogPanel:
 
     def add_log(self, text: str, level: str = "INFO") -> None:
         """Добавить сообщение в лог с указанным уровнем (для цвета)."""
-        import textwrap
-
-        char_width = self.font.size("a")[0]
-        char_width = 1 if char_width == 0 else char_width
+        # BUG FIX: Заменяем textwrap на ручной перенос по словам, опираясь на
+        # реальную ширину текста в пикселях для корректной работы с
+        # пропорциональными шрифтами.
         # Резервируем место для слайдера (15px) и отступов
-        text_area_width = self.rect.width - 10 - 15 - 5  # отступ слева, слайдер, отступ справа
-        max_chars = text_area_width // char_width if text_area_width > 0 else 1
-        wrapped_lines = textwrap.wrap(text, width=max_chars)
+        text_area_width = self.rect.width - 10 - 15 - 5
+        if text_area_width <= 0:
+            return
+
         color = self.colors.get(level.upper(), self.colors["INFO"])
-        for line in wrapped_lines:
+        words = text.split(' ')
+
+        lines_to_add: List[str] = []
+        current_line = ""
+        for word in words:
+            # Если одно слово длиннее всей строки, аккуратно разрываем по символам
+            if self.font.size(word)[0] > text_area_width:
+                if current_line:
+                    lines_to_add.append(current_line)
+                temp_word = ""
+                for ch in word:
+                    if self.font.size(temp_word + ch)[0] > text_area_width:
+                        lines_to_add.append(temp_word)
+                        temp_word = ch
+                    else:
+                        temp_word += ch
+                current_line = temp_word
+                continue
+
+            test_line = f"{current_line} {word}" if current_line else word
+            if self.font.size(test_line)[0] <= text_area_width:
+                current_line = test_line
+            else:
+                lines_to_add.append(current_line)
+                current_line = word
+
+        if current_line:
+            lines_to_add.append(current_line)
+
+        for line in lines_to_add:
             self.messages.append((line, color))
 
         if self.is_auto_scrolling:

@@ -195,8 +195,16 @@ class Environment:
                 self.food.add(pos)
                 return
             attempts += 1
-        # As a fallback, just append without check, but avoid static objects
-        if "pos" in locals() and pos not in occupied_static:
+        # BUG FIX: В качестве запасного варианта, если не удалось найти
+        # свободную клетку за 10 попыток, добавляем еду в последнюю
+        # сгенерированную позицию, но только если она не занята статическим
+        # объектом, другим агентом или другой едой.
+        if (
+            "pos" in locals()
+            and pos not in occupied_static
+            and pos not in self.food
+            and not any(a.position == pos for a in self.agents.values())
+        ):
             self.food.add(pos)
 
     def _find_unoccupied_pair(

@@ -138,9 +138,11 @@ class EvolutionManager:  # pylint: disable=too-many-instance-attributes
         # Объект популяции содержит все геномы из последнего поколения.
         final_genomes_list = list(population.population.values())
 
-        # Разделяем на команды по четным/нечетным индексам, как в eval_genomes
-        genomes_a = [g for i, g in enumerate(final_genomes_list) if i % 2 == 0]
-        genomes_b = [g for i, g in enumerate(final_genomes_list) if i % 2 == 1]
+        # BUG FIX: Разделяем геномы на команды, используя атрибут `team`,
+        # который был добавлен в `eval_genomes`. Это надежнее, чем полагаться
+        # на порядок в словаре, который не гарантирован.
+        genomes_a = [g for g in final_genomes_list if hasattr(g, "team") and g.team == "BLUE"]
+        genomes_b = [g for g in final_genomes_list if hasattr(g, "team") and g.team == "RED"]
 
         # На случай, если фитнес None, считаем его -inf.
         # Если команда пуста, используем общего победителя как запасной вариант.
@@ -223,6 +225,8 @@ class EvolutionManager:  # pylint: disable=too-many-instance-attributes
                 # Обнуляем фитнес перед стартом эпизода
                 genome.fitness = 0.0
                 team = "BLUE" if idx % 2 == 0 else "RED"
+                # BUG FIX: Сохраняем принадлежность к команде в самом геноме.
+                genome.team = team
                 net = neat.nn.FeedForwardNetwork.create(genome, config)
                 # Гарантируем уникальную клетку при спавне
                 while True:
@@ -301,33 +305,36 @@ class EvolutionManager:  # pylint: disable=too-many-instance-attributes
                                 renderer.add_log(f"Агент {agent.id} бездействие", "INFO")
 
                 # --- Reward shaping: поощрение за приближение к целям ---
-                # 1. Еда (основная цель)
-                if env.food:
-                    x, y = agent.position
-                    nearest_food_pos = min(env.food, key=lambda p: hypot(p[0] - x, p[1] - y))
-                    current_dist = hypot(nearest_food_pos[0] - x, nearest_food_pos[1] - y)
-                    last_dist = prev_dist_to_food.get(agent.id, current_dist)
+                # BUG FIX: Эта логика должна итерироваться по всем живым агентам,
+                # а не использовать оставшуюся переменную `agent` из предыдущего цикла.
+                for agent in env.agents.values():
+                    # 1. Еда (основная цель)
+                    if env.food:
+                        x, y = agent.position
+                        nearest_food_pos = min(env.food, key=lambda p: hypot(p[0] - x, p[1] - y))
+                        current_dist = hypot(nearest_food_pos[0] - x, nearest_food_pos[1] - y)
+                        last_dist = prev_dist_to_food.get(agent.id, current_dist)
 
-                    if current_dist < last_dist:
-                        agent.genome.fitness += self._const.food_proximity_reward
-                    elif current_dist > last_dist:
-                        agent.genome.fitness -= self._const.food_proximity_penalty
-                    prev_dist_to_food[agent.id] = current_dist
+                        if current_dist < last_dist:
+                            agent.genome.fitness += self._const.food_proximity_reward
+                        elif current_dist > last_dist:
+                            agent.genome.fitness -= self._const.food_proximity_penalty
+                        prev_dist_to_food[agent.id] = current_dist
 
-                # 2. Телепорты (вторичная цель для исследования)
-                if env.teleporters:
-                    x, y = agent.position
-                    nearest_tele_pos = min(
-                        env.teleporters.keys(), key=lambda p: hypot(p[0] - x, p[1] - y)
-                    )
-                    current_dist = hypot(nearest_tele_pos[0] - x, nearest_tele_pos[1] - y)
-                    last_dist = prev_dist_to_teleporter.get(agent.id, current_dist)
+                    # 2. Телепорты (вторичная цель для исследования)
+                    if env.teleporters:
+                        x, y = agent.position
+                        nearest_tele_pos = min(
+                            env.teleporters.keys(), key=lambda p: hypot(p[0] - x, p[1] - y)
+                        )
+                        current_dist = hypot(nearest_tele_pos[0] - x, nearest_tele_pos[1] - y)
+                        last_dist = prev_dist_to_teleporter.get(agent.id, current_dist)
 
-                    if current_dist < last_dist:
-                        agent.genome.fitness += self._const.teleporter_proximity_reward
-                    elif current_dist > last_dist:
-                        agent.genome.fitness -= self._const.teleporter_proximity_penalty
-                    prev_dist_to_teleporter[agent.id] = current_dist
+                        if current_dist < last_dist:
+                            agent.genome.fitness += self._const.teleporter_proximity_reward
+                        elif current_dist > last_dist:
+                            agent.genome.fitness -= self._const.teleporter_proximity_penalty
+                        prev_dist_to_teleporter[agent.id] = current_dist
 
                 # --- Шаг среды и награды за еду ---
                 eaters = env.step()

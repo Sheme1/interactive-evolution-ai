@@ -98,6 +98,7 @@ class AppManager:  # pylint: disable=too-few-public-methods
         from .utils.constants import compute_constants
         from .game.renderer import Renderer  # type: ignore[attr-defined]
         from .utils.console_utils import create_metrics_renderable
+        from rich.live import Live
         import random
 
         field_size = self._settings.get_int("Field", "field_size")
@@ -133,139 +134,139 @@ class AppManager:  # pylint: disable=too-few-public-methods
         obstacles_percentage = self._settings.get_str("Environment", "obstacles_percentage")
         teleporters_count = self._settings.get_int("Environment", "teleporters_count")
 
-        # Бесконечный цикл раундов
-        while True:
-            renderer.add_log(f"Раунд {round_idx + 1}. Начали!", "GENERATION")
-            round_idx += 1
-            # --- (Re)создаём среду без респавна еды ---
-            # Настраиваем поведение респавна в зависимости от конфигурации.
-            food_respawn = self._settings.get_bool("Simulation", "food_respawn")
-            if food_respawn:
-                env = Environment(
-                    field_size,
-                    food_qty,
-                    obstacles_percentage_str=obstacles_percentage,
-                    teleporters_count=teleporters_count,
-                )
-            else:
-                env = Environment(
-                    field_size,
-                    food_qty,
-                    spawn_interval=999_999,  # по сути блокируем респавн
-                    spawn_batch=0,
-                    obstacles_percentage_str=obstacles_percentage,
-                    teleporters_count=teleporters_count,
-                )
-
-            # Создаём агентов заново, чтобы сбросить энергию/позицию
-            agent_a = Agent(
-                0,
-                "BLUE",
-                (random.randint(0, field_size - 1), random.randint(0, field_size - 1)),
-                genome_a,
-                net_a,
-            )
-            agent_b = Agent(
-                1,
-                "RED",
-                (random.randint(0, field_size - 1), random.randint(0, field_size - 1)),
-                genome_b,
-                net_b,
-            )
-            env.add_agent(agent_a)
-            env.add_agent(agent_b)
-            agent_a._logged_death = False  # type: ignore[attr-defined]
-            agent_b._logged_death = False  # type: ignore[attr-defined]
-
-            eaten_a = 0
-            eaten_b = 0
-
-            # --- цикл шагов в пределах одного раунда ---
+        # BUG FIX: Используем Rich Live для обновления метрик без мерцания консоли.
+        with Live(console=self._console, auto_refresh=False, transient=False) as live:
+            # Бесконечный цикл раундов
             while True:
-                # На каждом шаге перемешиваем агентов, чтобы порядок хода был
-                # случайным. Это предотвращает ситуацию, когда агент BLUE
-                # всегда ходит первым и получает преимущество.
-                agent_list = [agent_a, agent_b]
-                random.shuffle(agent_list)
-                for agent in agent_list:
-                    if agent.energy <= 0:
-                        continue  # мёртвый — пропускаем
-                    old_pos = agent.position
-                    obs = agent.get_observation(env)
-                    dx_raw, dy_raw = agent.net.activate(obs)
-                    threshold = const.move_threshold
-                    dx = -1 if dx_raw < -threshold else 1 if dx_raw > threshold else 0
-                    dy = -1 if dy_raw < -threshold else 1 if dy_raw > threshold else 0
-                    agent.move(dx, dy, field_size, env)
-                    if agent.position != old_pos:
-                        renderer.add_log(f"Агент {agent.team} -> {agent.position}", "MOVE")
-                    elif (dx, dy) != (0, 0):
-                        renderer.add_log(f"Агент {agent.team} столкновение", "WARNING")
+                renderer.add_log(f"Раунд {round_idx + 1}. Начали!", "GENERATION")
+                round_idx += 1
+                # --- (Re)создаём среду без респавна еды ---
+                # Настраиваем поведение респавна в зависимости от конфигурации.
+                food_respawn = self._settings.get_bool("Simulation", "food_respawn")
+                if food_respawn:
+                    env = Environment(
+                        field_size,
+                        food_qty,
+                        obstacles_percentage_str=obstacles_percentage,
+                        teleporters_count=teleporters_count,
+                    )
+                else:
+                    env = Environment(
+                        field_size,
+                        food_qty,
+                        spawn_interval=999_999,  # по сути блокируем респавн
+                        spawn_batch=0,
+                        obstacles_percentage_str=obstacles_percentage,
+                        teleporters_count=teleporters_count,
+                    )
 
-                # Шаг среды
-                eaters = env.step()
-                for eater in eaters:
-                    renderer.add_log(f"Агент {eater.team} съел еду", "EAT")
-                    if eater.team == "BLUE":
-                        eaten_a += 1
-                    else:
-                        eaten_b += 1
+                # Создаём агентов заново, чтобы сбросить энергию/позицию
+                agent_a = Agent(
+                    0,
+                    "BLUE",
+                    (random.randint(0, field_size - 1), random.randint(0, field_size - 1)),
+                    genome_a,
+                    net_a,
+                )
+                agent_b = Agent(
+                    1,
+                    "RED",
+                    (random.randint(0, field_size - 1), random.randint(0, field_size - 1)),
+                    genome_b,
+                    net_b,
+                )
+                env.add_agent(agent_a)
+                env.add_agent(agent_b)
+                agent_a._logged_death = False  # type: ignore[attr-defined]
+                agent_b._logged_death = False  # type: ignore[attr-defined]
 
-                # Логирование спавна еды
-                if food_respawn and env._ticks % env._spawn_interval == 0 and env._spawn_batch > 0:
-                    renderer.add_log(f"Новая еда ({env._spawn_batch} шт.)", "SPAWN")
+                eaten_a = 0
+                eaten_b = 0
 
-                # --- Проверка условий завершения раунда ---
-                a_dead = agent_a.energy <= 0
-                b_dead = agent_b.energy <= 0
-                food_empty = len(env.food) == 0
+                # --- цикл шагов в пределах одного раунда ---
+                while True:
+                    # На каждом шаге перемешиваем агентов, чтобы порядок хода был
+                    # случайным. Это предотвращает ситуацию, когда агент BLUE
+                    # всегда ходит первым и получает преимущество.
+                    agent_list = [agent_a, agent_b]
+                    random.shuffle(agent_list)
+                    for agent in agent_list:
+                        if agent.energy <= 0:
+                            continue  # мёртвый — пропускаем
+                        old_pos = agent.position
+                        obs = agent.get_observation(env)
+                        dx_raw, dy_raw = agent.net.activate(obs)
+                        threshold = const.move_threshold
+                        dx = -1 if dx_raw < -threshold else 1 if dx_raw > threshold else 0
+                        dy = -1 if dy_raw < -threshold else 1 if dy_raw > threshold else 0
+                        agent.move(dx, dy, field_size, env)
+                        if agent.position != old_pos:
+                            renderer.add_log(f"Агент {agent.team} -> {agent.position}", "MOVE")
+                        elif (dx, dy) != (0, 0):
+                            renderer.add_log(f"Агент {agent.team} столкновение", "WARNING")
 
-                if a_dead and not agent_a._logged_death:  # type: ignore[attr-defined]
-                    renderer.add_log("Агент BLUE погиб", "DEATH")
-                    agent_a._logged_death = True  # type: ignore[attr-defined]
-                if b_dead and not agent_b._logged_death:  # type: ignore[attr-defined]
-                    renderer.add_log("Агент RED погиб", "DEATH")
-                    agent_b._logged_death = True  # type: ignore[attr-defined]
-
-                if a_dead or b_dead or food_empty:
-                    # Определяем победителя раунда
-                    if a_dead and not b_dead:
-                        score_b += 1
-                    elif b_dead and not a_dead:
-                        score_a += 1
-                    elif food_empty:
-                        if eaten_a > eaten_b:
-                            score_a += 1
-                        elif eaten_b > eaten_a:
-                            score_b += 1
-
-                    winner_msg = ""
-                    if a_dead and not b_dead:
-                        winner_msg = "RED победил!"
-                    elif b_dead and not a_dead:
-                        winner_msg = "BLUE победил!"
-                    elif food_empty:
-                        if eaten_a > eaten_b:
-                            winner_msg = "BLUE победил по очкам!"
-                        elif eaten_b > eaten_a:
-                            winner_msg = "RED победил по очкам!"
+                    # Шаг среды
+                    eaters = env.step()
+                    for eater in eaters:
+                        renderer.add_log(f"Агент {eater.team} съел еду", "EAT")
+                        if eater.team == "BLUE":
+                            eaten_a += 1
                         else:
-                            winner_msg = "Ничья!"
-                    renderer.add_log(f"Раунд завершен. {winner_msg}", "GENERATION")
-                    # Выводим счёт
-                    renderable = create_metrics_renderable(round_idx, float(score_a), float(score_b))
-                    # Восстанавливаем старое поведение (очистка + печать) для игрового режима.
-                    self._console.clear()
-                    self._console.print(renderable)
-                    break  # выходим из цикла шагов — начинаем новый раунд
+                            eaten_b += 1
 
-                # --- Рендеринг ---
-                renderer.draw_grid()
-                renderer.draw_obstacles(env.obstacles)
-                renderer.draw_teleporters(env.teleporters)
-                renderer.draw_food(env.food)
-                renderer.draw_agents(env.agents.values())
-                renderer.update()
+                    # Логирование спавна еды
+                    if food_respawn and env._ticks % env._spawn_interval == 0 and env._spawn_batch > 0:
+                        renderer.add_log(f"Новая еда ({env._spawn_batch} шт.)", "SPAWN")
+
+                    # --- Проверка условий завершения раунда ---
+                    a_dead = agent_a.energy <= 0
+                    b_dead = agent_b.energy <= 0
+                    food_empty = len(env.food) == 0
+
+                    if a_dead and not agent_a._logged_death:  # type: ignore[attr-defined]
+                        renderer.add_log("Агент BLUE погиб", "DEATH")
+                        agent_a._logged_death = True  # type: ignore[attr-defined]
+                    if b_dead and not agent_b._logged_death:  # type: ignore[attr-defined]
+                        renderer.add_log("Агент RED погиб", "DEATH")
+                        agent_b._logged_death = True  # type: ignore[attr-defined]
+
+                    if a_dead or b_dead or food_empty:
+                        # Определяем победителя раунда
+                        if a_dead and not b_dead:
+                            score_b += 1
+                        elif b_dead and not a_dead:
+                            score_a += 1
+                        elif food_empty:
+                            if eaten_a > eaten_b:
+                                score_a += 1
+                            elif eaten_b > eaten_a:
+                                score_b += 1
+
+                        winner_msg = ""
+                        if a_dead and not b_dead:
+                            winner_msg = "RED победил!"
+                        elif b_dead and not a_dead:
+                            winner_msg = "BLUE победил!"
+                        elif food_empty:
+                            if eaten_a > eaten_b:
+                                winner_msg = "BLUE победил по очкам!"
+                            elif eaten_b > eaten_a:
+                                winner_msg = "RED победил по очкам!"
+                            else:
+                                winner_msg = "Ничья!"
+                        renderer.add_log(f"Раунд завершен. {winner_msg}", "GENERATION")
+                        # Выводим счёт
+                        renderable = create_metrics_renderable(round_idx, float(score_a), float(score_b))
+                        live.update(renderable, refresh=True)
+                        break  # выходим из цикла шагов — начинаем новый раунд
+
+                    # --- Рендеринг ---
+                    renderer.draw_grid()
+                    renderer.draw_obstacles(env.obstacles)
+                    renderer.draw_teleporters(env.teleporters)
+                    renderer.draw_food(env.food)
+                    renderer.draw_agents(env.agents.values())
+                    renderer.update()
 
     def _handle_continue_training(self) -> None:
         file_a = pick_model_file("Выберите модель для команды A (BLUE)")
