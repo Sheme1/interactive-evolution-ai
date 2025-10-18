@@ -13,7 +13,7 @@ from rich.console import Console
 from .utils.settings import Settings
 from .core.evolution import EvolutionManager
 from .utils.file_utils import pick_model_file
-from .game.renderer import UserQuitException
+from .game.exceptions import UserQuitException
 
 
 class AppManager:  # pylint: disable=too-few-public-methods

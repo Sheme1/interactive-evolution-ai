@@ -19,6 +19,9 @@ venv/
 .idea/
 .cursor
 @.cursorignore
+.claude/
+PLAN.md
+.cursorignore
 
 # Project-specific
 interactive-evolution-ai/models/

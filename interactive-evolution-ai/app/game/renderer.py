@@ -25,6 +25,7 @@ except ImportError:  # pragma: no cover – модуль может отсутс
 
 
 from ..core.agent import Agent, GridPos
+from .exceptions import UserQuitException
 
 
 Color = Tuple[int, int, int]
@@ -35,12 +36,6 @@ GRAY: Color = (211, 211, 211)
 BLACK: Color = (0, 0, 0)
 DARK_GRAY: Color = (105, 105, 105)
 PURPLE: Color = (148, 0, 211)
-
-
-class UserQuitException(Exception):
-    """Исключение, выбрасываемое при закрытии окна Pygame пользователем."""
-
-    pass
 
 class LogPanel:
     """Панель для отображения цветных логов в реальном времени с прокруткой."""

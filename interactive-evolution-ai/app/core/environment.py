@@ -5,10 +5,14 @@ size ``field_size x field_size``. It performs collision resolution (food
 consumption) and ensures entities stay within bounds. No Pygame or rendering
 logic is included here — the :pyclass:`app.game.renderer.Renderer` is
 responsible for visualisation.
+
+Обновлено: детерминированная генерация окружения по seed, телепорты с
+критерием удалённости, периодический респавн еды.
 """
 from __future__ import annotations
 
 import random
+import math
 from typing import Dict, List, Set, Optional, Tuple
 
 from .agent import Agent, GridPos
@@ -25,7 +29,28 @@ class Environment:
         spawn_batch: int = 5,
         obstacles_percentage_str: str = "0%",
         teleporters_count: int = 0,
+        seed: Optional[int] = None,
     ) -> None:
+        """Создать среду симуляции.
+
+        Parameters
+        ----------
+        field_size : int
+            Размер поля (квадрат field_size × field_size).
+        food_quantity : int
+            Начальное количество еды на поле.
+        spawn_interval : int
+            Интервал (в тиках) между респавнами еды.
+        spawn_batch : int
+            Количество еды, добавляемой за каждый респавн.
+        obstacles_percentage_str : str
+            Процент клеток, занятых препятствиями (например, "5%").
+        teleporters_count : int
+            Количество телепортов (должно быть чётным, так как они парные).
+        seed : int, optional
+            Seed для детерминированной генерации окружения. Если None,
+            используется случайная генерация.
+        """
         self.field_size: int = field_size
         self.agents: Dict[int, Agent] = {}
         self.food: Set[GridPos] = set()
@@ -35,18 +60,26 @@ class Environment:
         self._spawn_interval = spawn_interval
         self._spawn_batch = spawn_batch
         self._ticks = 0
+        self._obstacles_percentage_str = obstacles_percentage_str
+        self._teleporters_count = teleporters_count
+        self._current_seed = seed
 
-        self._generate_obstacles(obstacles_percentage_str)
-        self._generate_teleporters(teleporters_count)
-
-        # Spawn initial food pellets.
-        self.spawn_food()
+        # Генерируем окружение
+        self.reset(seed)
 
     # ------------------------------------------------------------------
     # Environment generation
     # ------------------------------------------------------------------
-    def _generate_obstacles(self, percentage_str: str) -> None:
-        """Generate obstacle positions based on a percentage of the field area."""
+    def _generate_obstacles(self, percentage_str: str, rng: random.Random) -> None:
+        """Сгенерировать препятствия на основе процента от площади поля.
+
+        Parameters
+        ----------
+        percentage_str : str
+            Процент клеток (например, "5%").
+        rng : random.Random
+            Генератор случайных чисел для детерминированной генерации.
+        """
         try:
             percentage = float(percentage_str.strip().replace("%", ""))
         except (ValueError, TypeError):
@@ -54,28 +87,41 @@ class Environment:
 
         num_obstacles = int((self.field_size * self.field_size) * (percentage / 100.0))
 
-        # Use a seeded RNG for deterministic obstacle placement across runs
-        placer_rng = random.Random(self.field_size)
+        self.obstacles.clear()
         while len(self.obstacles) < num_obstacles:
             pos = (
-                placer_rng.randint(0, self.field_size - 1),
-                placer_rng.randint(0, self.field_size - 1),
+                rng.randint(0, self.field_size - 1),
+                rng.randint(0, self.field_size - 1),
             )
             if pos not in self.obstacles:
                 self.obstacles.add(pos)
 
-    def _generate_teleporters(self, count: int) -> None:
-        """Generate fixed, paired teleporter locations."""
-        if count <= 0 or count % 2 != 0:
-            return  # Must be an even, positive number
+    def _generate_teleporters(self, count: int, rng: random.Random) -> None:
+        """Сгенерировать парные телепорты с критерием удалённости.
 
-        # Use a seeded RNG for deterministic placement
-        placer_rng = random.Random(self.field_size + 1)  # Different seed from obstacles
+        Телепорты генерируются парами, при этом расстояние между клетками
+        пары должно быть > 0.5 × diagonal (диагональ поля).
+
+        Parameters
+        ----------
+        count : int
+            Количество телепортов (должно быть чётным).
+        rng : random.Random
+            Генератор случайных чисел.
+        """
+        if count <= 0 or count % 2 != 0:
+            return  # Должно быть чётным и положительным
+
+        self.teleporters.clear()
         occupied_tiles = self.obstacles.copy()
         num_pairs = count // 2
 
+        # Критерий удалённости: > 0.5 × diagonal
+        diagonal = math.sqrt(2 * self.field_size ** 2)
+        min_distance = 0.5 * diagonal
+
         for _ in range(num_pairs):
-            pos1, pos2 = self._find_unoccupied_pair(placer_rng, occupied_tiles)
+            pos1, pos2 = self._find_distant_pair(rng, occupied_tiles, min_distance)
             if pos1 and pos2:
                 self.teleporters[pos1] = pos2
                 self.teleporters[pos2] = pos1
@@ -85,14 +131,23 @@ class Environment:
     # ------------------------------------------------------------------
     # Food management
     # ------------------------------------------------------------------
-    def spawn_food(self) -> None:
-        """Randomly distribute *food_quantity* pellets on empty grid cells."""
+    def spawn_food(self, rng: Optional[random.Random] = None) -> None:
+        """Распределить начальное количество еды на свободных клетках.
+
+        Parameters
+        ----------
+        rng : random.Random, optional
+            Генератор случайных чисел. Если None, используется глобальный random.
+        """
+        if rng is None:
+            rng = random.Random()
+
         self.food.clear()
         occupied_tiles = self.obstacles.union(set(self.teleporters.keys()))
         while len(self.food) < self._food_quantity:
             pos = (
-                random.randint(0, self.field_size - 1),
-                random.randint(0, self.field_size - 1),
+                rng.randint(0, self.field_size - 1),
+                rng.randint(0, self.field_size - 1),
             )
             # Ensure no duplicates and not on obstacles/teleporters.
             if pos not in self.food and pos not in occupied_tiles:
@@ -124,10 +179,36 @@ class Environment:
     # ------------------------------------------------------------------
     # Simulation helpers
     # ------------------------------------------------------------------
-    def reset(self) -> None:
-        """Remove all agents and respawn food."""
+    def reset(self, seed: Optional[int] = None) -> None:
+        """Сбросить среду и сгенерировать новое окружение.
+
+        Parameters
+        ----------
+        seed : int, optional
+            Seed для детерминированной генерации. Если None, используется
+            текущий seed или случайная генерация.
+        """
+        if seed is not None:
+            self._current_seed = seed
+
+        # Создаём генератор с заданным seed
+        if self._current_seed is not None:
+            rng = random.Random(self._current_seed)
+        else:
+            rng = random.Random()
+
+        # Очищаем агентов
         self.agents.clear()
-        self.spawn_food()
+
+        # Генерируем окружение
+        self._generate_obstacles(self._obstacles_percentage_str, rng)
+        self._generate_teleporters(self._teleporters_count, rng)
+
+        # Спавним еду
+        self.spawn_food(rng)
+
+        # Сбрасываем счётчик тиков
+        self._ticks = 0
 
     def step(self) -> List[Agent]:
         """Advance the environment by **one** logical tick.
@@ -207,13 +288,50 @@ class Environment:
         ):
             self.food.add(pos)
 
-    def _find_unoccupied_pair(
-        self, placer_rng: random.Random, occupied_tiles: Set[GridPos]
+    def _find_distant_pair(
+        self,
+        rng: random.Random,
+        occupied_tiles: Set[GridPos],
+        min_distance: float
     ) -> Tuple[Optional[GridPos], Optional[GridPos]]:
-        """Helper to find two distinct, unoccupied grid positions."""
-        for _ in range(100):  # Limit attempts
-            p1 = (placer_rng.randint(0, self.field_size - 1), placer_rng.randint(0, self.field_size - 1))
-            p2 = (placer_rng.randint(0, self.field_size - 1), placer_rng.randint(0, self.field_size - 1))
-            if p1 != p2 and p1 not in occupied_tiles and p2 not in occupied_tiles:
+        """Найти пару удалённых друг от друга свободных клеток.
+
+        Parameters
+        ----------
+        rng : random.Random
+            Генератор случайных чисел.
+        occupied_tiles : Set[GridPos]
+            Набор уже занятых клеток.
+        min_distance : float
+            Минимальное Евклидово расстояние между клетками пары.
+
+        Returns
+        -------
+        Tuple[Optional[GridPos], Optional[GridPos]]
+            Пара позиций, или (None, None) если не найдено.
+        """
+        max_attempts = 200
+        best_pair = (None, None)
+        best_distance = 0.0
+
+        for _ in range(max_attempts):
+            p1 = (rng.randint(0, self.field_size - 1), rng.randint(0, self.field_size - 1))
+            p2 = (rng.randint(0, self.field_size - 1), rng.randint(0, self.field_size - 1))
+
+            if p1 == p2 or p1 in occupied_tiles or p2 in occupied_tiles:
+                continue
+
+            # Вычисляем Евклидово расстояние
+            distance = math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
+            # Если нашли пару с достаточной дистанцией, возвращаем её
+            if distance > min_distance:
                 return p1, p2
-        return None, None
+
+            # Иначе запоминаем лучшую найденную пару
+            if distance > best_distance:
+                best_distance = distance
+                best_pair = (p1, p2)
+
+        # Fallback: возвращаем лучшую найденную пару (или (None, None))
+        return best_pair

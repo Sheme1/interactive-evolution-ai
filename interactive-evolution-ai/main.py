@@ -5,8 +5,8 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent
 sys.path.append(str(project_root))
 
-from app.app_manager import AppManager  # noqa: E402
-
 
 if __name__ == "__main__":
+    # Импорт внутри if __name__ для корректной работы multiprocessing на Windows
+    from app.app_manager import AppManager
     AppManager().run()
