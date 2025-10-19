@@ -61,10 +61,17 @@ def evaluate_1v1_match(
     food_quantity = settings_dict["food_quantity"]
     obstacles_percentage = settings_dict["obstacles_percentage"]
     teleporters_count = settings_dict["teleporters_count"]
-    spawn_interval = settings_dict.get("spawn_interval", 10)
-    spawn_batch = settings_dict.get("spawn_batch", 3)
+    food_respawn = settings_dict.get("food_respawn", True)
     energy_max = settings_dict["energy_max"]
     move_threshold = settings_dict["move_threshold"]
+
+    # Настраиваем респавн еды
+    if food_respawn:
+        spawn_interval = settings_dict.get("spawn_interval", 10)
+        spawn_batch = settings_dict.get("spawn_batch", 3)
+    else:
+        spawn_interval = 999_999  # Блокируем респавн
+        spawn_batch = 0
 
     # Создаём окружение с заданным seed
     env = Environment(

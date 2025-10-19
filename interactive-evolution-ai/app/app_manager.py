@@ -101,14 +101,8 @@ class AppManager:  # pylint: disable=too-few-public-methods
         from rich.live import Live
         import random
 
-        field_size = self._settings.get_int("Field", "field_size")
-        food_qty = self._settings.get_int("Simulation", "food_quantity")
-        const = compute_constants(self._settings)
-        Agent.ENERGY_MAX = const.energy_max
-        self._console.print(f"[dim]Игровой режим. Порог движения: {const.move_threshold:.2f}[/dim]")
-
         # -------------------------
-        # Подготовка NEAT сетей
+        # Подготовка NEAT сетей (выполняется один раз)
         # -------------------------
         config = neat.Config(
             neat.DefaultGenome,
@@ -131,11 +125,10 @@ class AppManager:  # pylint: disable=too-few-public-methods
         score_b = 0
         round_idx = 0
 
+        # Инициализация renderer (будет пересоздан, если изменится field_size)
+        field_size = self._settings.get_int("Field", "field_size")
         fps_setting = self._settings.get_int("Display", "fps")
         renderer = Renderer(field_size, cell_size=20, fps=fps_setting)
-
-        obstacles_percentage = self._settings.get_str("Environment", "obstacles_percentage")
-        teleporters_count = self._settings.get_int("Environment", "teleporters_count")
 
         # BUG FIX: Используем Rich Live для обновления метрик без мерцания консоли.
         with Live(console=self._console, auto_refresh=False, transient=False) as live:
@@ -144,13 +137,26 @@ class AppManager:  # pylint: disable=too-few-public-methods
             while not quit_game:
                 renderer.add_log(f"Раунд {round_idx + 1}. Начали!", "GENERATION")
                 round_idx += 1
-                # --- (Re)создаём среду без респавна еды ---
-                # Настраиваем поведение респавна в зависимости от конфигурации.
+
+                # --- Перечитываем настройки каждый раунд для динамического применения ---
+                field_size = self._settings.get_int("Field", "field_size")
+                food_qty = self._settings.get_int("Simulation", "food_quantity")
+                obstacles_percentage = self._settings.get_str("Environment", "obstacles_percentage")
+                teleporters_count = self._settings.get_int("Environment", "teleporters_count")
                 food_respawn = self._settings.get_bool("Simulation", "food_respawn")
+                respawn_interval = self._settings.get_int("Simulation", "respawn_interval")
+                respawn_batch = self._settings.get_int("Simulation", "respawn_batch")
+
+                # Обновляем константы (порог движения и т.д.)
+                const = compute_constants(self._settings)
+                Agent.ENERGY_MAX = const.energy_max
+
                 if food_respawn:
                     env = Environment(
                         field_size,
                         food_qty,
+                        spawn_interval=respawn_interval,
+                        spawn_batch=respawn_batch,
                         obstacles_percentage_str=obstacles_percentage,
                         teleporters_count=teleporters_count,
                     )

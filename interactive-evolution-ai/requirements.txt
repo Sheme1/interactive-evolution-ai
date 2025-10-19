@@ -1,6 +1,8 @@
 pygame
 neat-python
-torch
 rich
 pyperclip
 questionary
+numpy
+numba
+snakeviz

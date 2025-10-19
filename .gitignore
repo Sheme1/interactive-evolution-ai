@@ -20,7 +20,7 @@ venv/
 .cursor
 @.cursorignore
 .claude/
-PLAN.md
+KAGGLE_SETUP.md
 .cursorignore
 
 # Project-specific

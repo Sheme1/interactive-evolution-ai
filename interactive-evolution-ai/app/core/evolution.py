@@ -226,10 +226,17 @@ def _run_1v1_match_static(
     food_quantity = settings_dict["food_quantity"]
     obstacles_percentage = settings_dict["obstacles_percentage"]
     teleporters_count = settings_dict["teleporters_count"]
-    spawn_interval = settings_dict["respawn_interval"]
-    spawn_batch = settings_dict["respawn_batch"]
+    food_respawn = settings_dict.get("food_respawn", True)  # Для обратной совместимости
     energy_max = const_dict["energy_max"]
     move_threshold = const_dict["move_threshold"]
+
+    # Настраиваем респавн еды
+    if food_respawn:
+        spawn_interval = settings_dict["respawn_interval"]
+        spawn_batch = settings_dict["respawn_batch"]
+    else:
+        spawn_interval = 999_999  # Блокируем респавн
+        spawn_batch = 0
 
     # Создаём окружение
     env = Environment(
@@ -393,9 +400,9 @@ class EvolutionManager:
             Количество матчей для этого поколения.
         """
         if generation < 50:
-            return 2  # Быстрая оценка для случайных геномов
+            return 3  # Быстрая оценка для случайных геномов
         elif generation < 200:
-            return 3  # Средняя точность
+            return 5  # Средняя точность
         else:
             # Полная точность для зрелых популяций
             return self._settings.get_int("Simulation", "matches_per_genome")
@@ -532,8 +539,13 @@ class EvolutionManager:
         except KeyboardInterrupt:
             console.print("\n[bold yellow]Тренировка прервана пользователем (Ctrl+C).[/bold yellow]")
             console.print("[dim]Сохранение лучших геномов текущего поколения...[/dim]")
+            # Принудительно завершаем воркеры
+            if pool:
+                console.print("[dim]Принудительное завершение воркеров...[/dim]")
+                pool.terminate()
+                pool.join()
         finally:
-            # Закрываем pool при выходе (нормальном или через Ctrl+C)
+            # Закрываем pool при нормальном выходе
             if pool:
                 console.print("[dim]Закрытие пула воркеров...[/dim]")
                 pool.close()
@@ -672,6 +684,7 @@ class EvolutionManager:
             "food_quantity": self._settings.get_int("Simulation", "food_quantity"),
             "obstacles_percentage": self._settings.get_str("Environment", "obstacles_percentage"),
             "teleporters_count": self._settings.get_int("Environment", "teleporters_count"),
+            "food_respawn": self._settings.get_bool("Simulation", "food_respawn"),
             "respawn_interval": self._settings.get_int("Simulation", "respawn_interval"),
             "respawn_batch": self._settings.get_int("Simulation", "respawn_batch"),
         }
@@ -763,8 +776,15 @@ class EvolutionManager:
         food_quantity = self._settings.get_int("Simulation", "food_quantity")
         obstacles_percentage = self._settings.get_str("Environment", "obstacles_percentage")
         teleporters_count = self._settings.get_int("Environment", "teleporters_count")
-        spawn_interval = self._settings.get_int("Simulation", "respawn_interval")
-        spawn_batch = self._settings.get_int("Simulation", "respawn_batch")
+        food_respawn = self._settings.get_bool("Simulation", "food_respawn")
+
+        # Настраиваем респавн еды
+        if food_respawn:
+            spawn_interval = self._settings.get_int("Simulation", "respawn_interval")
+            spawn_batch = self._settings.get_int("Simulation", "respawn_batch")
+        else:
+            spawn_interval = 999_999  # Блокируем респавн
+            spawn_batch = 0
 
         # Создаём окружение
         env = Environment(

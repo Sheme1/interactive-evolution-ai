@@ -1,0 +1,5 @@
+# Зависимости для облачного обучения (без GUI)
+neat-python
+rich
+numpy
+numba

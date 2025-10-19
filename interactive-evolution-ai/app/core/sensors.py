@@ -19,7 +19,7 @@ import numpy as np
 from typing import TYPE_CHECKING, List, Set, Dict, Tuple
 
 try:
-    from numba import jit
+    from numba import jit, prange
     NUMBA_AVAILABLE = True
 except ImportError:
     # Fallback: если Numba не установлен, используем dummy decorator
@@ -28,6 +28,8 @@ except ImportError:
         def decorator(func):
             return func
         return decorator
+    # Fallback для prange - обычный range
+    prange = range
 
 if TYPE_CHECKING:
     from .environment import Environment
@@ -47,7 +49,7 @@ NUM_CHANNELS = 4
 # Канал 3: враги (агенты противоположной команды)
 
 
-@jit(nopython=True, cache=True, fastmath=True)
+@jit(nopython=True, cache=True, fastmath=True, parallel=True)
 def _build_observation_numba(
     agent_x: int,
     agent_y: int,
@@ -59,7 +61,10 @@ def _build_observation_numba(
 ) -> np.ndarray:
     """Numba-оптимизированная функция построения эгоцентрического наблюдения.
 
-    КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: Компилируется в машинный код, ~10-20× быстрее Python.
+    КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: Компилируется в машинный код с параллельным выполнением.
+    - parallel=True: Использует все доступные ядра CPU
+    - prange: Распараллеливает внешний цикл по строкам
+    - Ожидаемое ускорение: 2-4× на многоядерных CPU
 
     Parameters
     ----------
@@ -84,8 +89,8 @@ def _build_observation_numba(
     # Создаём тензор наблюдений
     observation = np.zeros((NUM_CHANNELS, WINDOW_SIZE, WINDOW_SIZE), dtype=np.float32)
 
-    # Проходим по окну 5×5
-    for local_y in range(WINDOW_SIZE):
+    # Проходим по окну 5×5 с параллельным выполнением по строкам
+    for local_y in prange(WINDOW_SIZE):
         for local_x in range(WINDOW_SIZE):
             # Вычисляем мировые координаты
             world_x = agent_x + (local_x - WINDOW_RADIUS)
@@ -160,9 +165,10 @@ def get_egocentric_observation(
     agent_x, agent_y = agent.position
     field_size = env.field_size
 
-    # Конвертируем данные окружения в NumPy массивы для Numba
-    obstacles_array = np.array(list(env.obstacles), dtype=np.int32) if env.obstacles else np.empty((0, 2), dtype=np.int32)
-    food_array = np.array(list(env.food), dtype=np.int32) if env.food else np.empty((0, 2), dtype=np.int32)
+    # КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: Используем прямой доступ к NumPy массивам
+    # Это полностью устраняет конвертацию set -> list -> numpy.ndarray
+    obstacles_array = env.get_obstacles_view()
+    food_array = env.get_food_view()
     teleporters_array = np.array(list(env.teleporters.keys()), dtype=np.int32) if env.teleporters else np.empty((0, 2), dtype=np.int32)
 
     # Собираем позиции врагов

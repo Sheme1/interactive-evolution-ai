@@ -41,6 +41,10 @@ class Settings:
         self._parser = configparser.ConfigParser(interpolation=None)
         # Preserve case of keys when writing back.
         self._parser.optionxform = str  # type: ignore[attr-defined]
+        self._reload()
+
+    def _reload(self) -> None:
+        """Перечитать настройки из файла (внутренний метод)."""
         self._parser.read(self.config_path)
 
     # ---------------------------------------------------------------------
@@ -48,18 +52,22 @@ class Settings:
     # ---------------------------------------------------------------------
     def get_int(self, section: str, option: str) -> int:
         """Return *int* value from the config."""
+        self._reload()  # Перечитываем настройки перед чтением
         return self._parser.getint(section, option)
 
     def get_float(self, section: str, option: str) -> float:
         """Return *float* value from the config."""
+        self._reload()  # Перечитываем настройки перед чтением
         return self._parser.getfloat(section, option)
 
     def get_str(self, section: str, option: str) -> str:
         """Return *str* value from the config."""
+        self._reload()  # Перечитываем настройки перед чтением
         return self._parser.get(section, option)
 
     def get_bool(self, section: str, option: str) -> bool:  # noqa: D401
         """Return *bool* value (yes/no, true/false, 1/0)."""
+        self._reload()  # Перечитываем настройки перед чтением
         return self._parser.getboolean(section, option, fallback=False)
 
     # ------------------------------------------------------------------
