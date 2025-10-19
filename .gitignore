@@ -22,6 +22,7 @@ venv/
 .claude/
 KAGGLE_SETUP.md
 .cursorignore
+TENSORNEAT_MIGRATION.md
 
 # Project-specific
 interactive-evolution-ai/models/

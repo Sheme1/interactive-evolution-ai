@@ -6,3 +6,10 @@ questionary
 numpy
 numba
 snakeviz
+
+# TensorNEAT и зависимости для GPU-ускоренного NEAT
+jax[cpu]>=0.4.28  # Для CPU версии JAX (на Kaggle можно заменить на jax[cuda])
+jaxlib>=0.4.28
+git+https://github.com/EMI-Group/tensorneat.git  # TensorNEAT
+brax>=0.10.3  # Опционально: для RL окружений
+gymnax>=0.0.8  # Опционально: для дополнительных окружений
