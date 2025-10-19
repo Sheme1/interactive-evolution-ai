@@ -102,6 +102,7 @@ class TensorNEATTrainer:
             genome=DefaultGenome(
                 num_inputs=num_inputs,
                 num_outputs=num_outputs,
+                max_nodes=150,  # Увеличено с 50 до 150, чтобы соответствовать initial_nodes=102
                 init_hidden_layers=(),  # Начинаем без скрытых слоёв
                 node_gene=BiasNode(
                     activation_options=ACT.tanh,  # Функция активации

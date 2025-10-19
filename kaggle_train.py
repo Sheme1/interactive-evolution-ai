@@ -42,11 +42,11 @@ def setup_for_cloud():
         print(f"✅ JAX установлен, версия: {jax.__version__}")
         print(f"📊 Доступно устройств JAX: {len(devices)}")
         for i, device in enumerate(devices):
-            device_type = device.device_kind
+            device_type = device.platform
             print(f"   [{i}] {device_type}: {device}")
 
         # Проверяем наличие GPU/TPU
-        has_accelerator = any(d.device_kind in ['gpu', 'tpu'] for d in devices)
+        has_accelerator = any(d.platform in ['gpu', 'tpu'] for d in devices)
         if has_accelerator:
             print("🎉 Обнаружен GPU/TPU! Обучение будет использовать аппаратное ускорение.")
         else:
